@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwiftWrite — Distraction-Free Markdown Editor</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,300;0,400;0,500;1,300;1,400&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #F7F4EE;
+    --surface: #EFEBE1;
+    --border: #D8D0C0;
+    --text: #2C2416;
+    --text-muted: #8C7D6A;
+    --accent: #C85A2A;
+    --accent-soft: #F0E8DC;
+    --editor-bg: #FDFAF5;
+    --preview-bg: #FDFAF5;
+    --scrollbar: #D0C8B8;
+    --overlay: rgba(44,36,22,0.55);
+    --focus-bg: #1A1510;
+    --focus-text: #E8E0D0;
+    --focus-muted: #6A5E4E;
+  }
+
+  [data-theme="dark"] {
+    --bg: #1A1510;
+    --surface: #231E18;
+    --border: #3A3028;
+    --text: #E8E0D0;
+    --text-muted: #6A5E4E;
+    --accent: #E07040;
+    --accent-soft: #2A2018;
+    --editor-bg: #1E1912;
+    --preview-bg: #1E1912;
+    --scrollbar: #3A3028;
+  }
+
+  [data-theme="sepia"] {
+    --bg: #F2E8D5;
+    --surface: #E8DABC;
+    --border: #C8B898;
+    --text: #3C2C14;
+    --text-muted: #7A6040;
+    --accent: #8B4513;
+    --accent-soft: #EAD8B8;
+    --editor-bg: #F8F0DC;
+    --preview-bg: #F8F0DC;
+    --scrollbar: #C0A878;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.3s, color 0.3s;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 46px;
+    padding: 0 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+    position: relative;
+    z-index: 100;
+    transition: all 0.3s;
+  }
+
+  #topbar .brand {
+    font-family: 'Literata', serif;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #topbar .brand span {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .topbar-center {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .doc-tab {
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    color: var(--text-muted);
+    background: transparent;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .doc-tab.active {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .doc-tab:hover:not(.active) {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  .doc-tab .close-tab {
+    display: none;
+    margin-left: 6px;
+    opacity: 0.5;
+    font-size: 11px;
+  }
+
+  .doc-tab:hover .close-tab,
+  .doc-tab.active .close-tab {
+    display: inline;
+  }
+
+  .close-tab:hover { opacity: 1; color: var(--accent); }
+
+  #add-doc-btn {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  #add-doc-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .icon-btn {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .icon-btn:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  #word-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.03em;
+    min-width: 80px;
+    text-align: right;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  #app {
+    display: flex;
+    height: calc(100vh - 46px);
+    overflow: hidden;
+  }
+
+  /* ── EDITOR PANE ── */
+  #editor-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+
+  #editor {
+    flex: 1;
+    width: 100%;
+    padding: 48px 56px;
+    background: var(--editor-bg);
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text);
+    caret-color: var(--accent);
+    overflow-y: auto;
+    transition: background 0.3s, color 0.3s, padding 0.4s;
+  }
+
+  #editor::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: 'Literata', serif;
+    font-size: 15px;
+  }
+
+  #editor::-webkit-scrollbar { width: 5px; }
+  #editor::-webkit-scrollbar-track { background: transparent; }
+  #editor::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+  /* ── PREVIEW PANE ── */
+  #preview-pane {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--preview-bg);
+    padding: 48px 56px;
+    transition: background 0.3s;
+    min-width: 0;
+  }
+
+  #preview-pane::-webkit-scrollbar { width: 5px; }
+  #preview-pane::-webkit-scrollbar-track { background: transparent; }
+  #preview-pane::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+  #preview-content {
+    font-family: 'Literata', serif;
+    font-size: 16px;
+    line-height: 1.9;
+    color: var(--text);
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  #preview-content h1,#preview-content h2,#preview-content h3,
+  #preview-content h4,#preview-content h5,#preview-content h6 {
+    font-family: 'Literata', serif;
+    font-weight: 500;
+    margin: 1.6em 0 0.5em;
+    line-height: 1.3;
+    color: var(--text);
+  }
+
+  #preview-content h1 { font-size: 2em; font-style: italic; }
+  #preview-content h2 { font-size: 1.45em; }
+  #preview-content h3 { font-size: 1.15em; }
+
+  #preview-content p { margin: 0 0 1.1em; }
+
+  #preview-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+  #preview-content blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 1.2em 0;
+    padding: 0.2em 1.4em;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  #preview-content code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  #preview-content pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 1.2em 0;
+  }
+
+  #preview-content pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  #preview-content ul, #preview-content ol {
+    padding-left: 1.6em;
+    margin: 0 0 1.1em;
+  }
+
+  #preview-content li { margin: 0.3em 0; }
+
+  #preview-content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2em 0;
+  }
+
+  #preview-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2em 0;
+    font-size: 0.92em;
+  }
+
+  #preview-content th, #preview-content td {
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    text-align: left;
+  }
+
+  #preview-content th {
+    background: var(--surface);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 0.85em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  #preview-content img { max-width: 100%; border-radius: 6px; }
+
+  /* ── STATUS BAR ── */
+  #statusbar {
+    height: 26px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 20px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    user-select: none;
+  }
+
+  #statusbar span { display: flex; align-items: center; gap: 4px; }
+
+  /* ── FOCUS MODE ── */
+  body.focus-mode #topbar,
+  body.focus-mode #statusbar { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+  body.focus-mode #topbar:hover,
+  body.focus-mode #statusbar:hover { opacity: 1; pointer-events: all; }
+
+  body.focus-mode #editor {
+    padding: 10vh 20vw;
+    font-size: 15px;
+  }
+
+  body.focus-mode #preview-pane {
+    display: none;
+  }
+
+  body.focus-mode #editor-pane {
+    border-right: none;
+  }
+
+  /* ── PREMIUM GATE MODAL ── */
+  #premium-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  #premium-modal.show { display: flex; }
+
+  .modal-box {
+    background: var(--editor-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 40px 44px;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+    animation: modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes modalIn {
+    from { transform: scale(0.88) translateY(20px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .modal-box .icon { font-size: 32px; margin-bottom: 16px; }
+
+  .modal-box h2 {
+    font-family: 'Literata', serif;
+    font-size: 22px;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .modal-box p {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+
+  .modal-features {
+    text-align: left;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .modal-features li { list-style: none; padding-left: 0; }
+  .modal-features li::before { content: "✦ "; color: var(--accent); font-size: 10px; }
+
+  .btn-primary {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: opacity 0.15s, transform 0.1s;
+    margin-bottom: 10px;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 10px;
+    border-radius: 9px;
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .modal-close-x {
+    position: absolute;
+    top: 14px; right: 16px;
+    background: none; border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .modal-close-x:hover { opacity: 1; }
+
+  /* ── THEME PICKER ── */
+  #theme-picker {
+    display: none;
+    position: absolute;
+    top: 50px; right: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    gap: 6px;
+    flex-direction: column;
+    min-width: 130px;
+  }
+
+  #theme-picker.show { display: flex; }
+
+  .theme-opt {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+
+  .theme-opt:hover { background: var(--accent-soft); }
+  .theme-opt.active { color: var(--accent); font-weight: 500; }
+  .theme-opt .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ── EXPORT MENU ── */
+  #export-menu {
+    display: none;
+    position: absolute;
+    top: 50px; right: 100px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    flex-direction: column;
+    min-width: 160px;
+  }
+
+  #export-menu.show { display: flex; }
+
+  .export-opt {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .export-opt:hover { background: var(--accent-soft); color: var(--accent); }
+  .export-opt.premium-locked { color: var(--text-muted); }
+  .export-opt.premium-locked::after { content: " 🔒"; font-size: 10px; }
+
+  /* ── EMPTY STATE ── */
+  #empty-state {
+    position: absolute;
+    top: 50%;
+    left: 25%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  #empty-state.show { opacity: 1; }
+
+  #empty-state h3 {
+    font-family: 'Literata', serif;
+    font-size: 18px;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 300;
+  }
+
+  #empty-state p {
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  /* ── LICENSE INPUT ── */
+  #license-section {
+    margin-top: 6px;
+  }
+
+  #license-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    margin-bottom: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #license-input:focus { border-color: var(--accent); }
+
+  .view-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+  }
+
+  .view-toggle button {
+    padding: 4px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .view-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ── AUTOSAVE INDICATOR ── */
+  #save-indicator {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  #save-indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="brand">Swift<span>Write</span></div>
+
+  <div class="topbar-center" id="doc-tabs">
+    <!-- tabs injected by JS -->
+    <button id="add-doc-btn" title="New document">+</button>
+  </div>
+
+  <div class="topbar-right">
+    <span id="word-count">0 words</span>
+    <span id="save-indicator">saved</span>
+
+    <div class="view-toggle" id="view-toggle">
+      <button id="btn-edit" class="active" onclick="setView('edit')">Edit</button>
+      <button id="btn-split" onclick="setView('split')">Split</button>
+      <button id="btn-preview" onclick="setView('preview')">Preview</button>
+    </div>
+
+    <button class="icon-btn" id="focus-btn" title="Focus mode (F11)">⊡</button>
+    <button class="icon-btn" id="export-btn" title="Export">↗</button>
+    <button class="icon-btn" id="theme-btn" title="Theme">◑</button>
+    <button class="icon-btn" id="upgrade-btn" title="Upgrade to Premium" style="color:var(--accent);border-color:var(--accent)">✦</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="editor-pane">
+    <textarea id="editor" placeholder="Begin writing…&#10;&#10;Markdown is supported. Your work saves automatically.&#10;&#10;# Heading&#10;**bold**, *italic*, `code`&#10;> blockquote&#10;- list item"></textarea>
+  </div>
+  <div id="preview-pane" style="display:none">
+    <div id="preview-content"></div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="status-words">⬡ 0 words</span>
+  <span id="status-chars">0 chars</span>
+  <span id="status-lines">0 lines</span>
+  <span id="status-doc" style="margin-left:auto;"></span>
+</div>
+
+<!-- THEME PICKER -->
+<div id="theme-picker">
+  <div class="theme-opt active" data-theme="light" onclick="setTheme('light')">
+    <div class="dot" style="background:#F7F4EE;"></div> Parchment
+  </div>
+  <div class="theme-opt" data-theme="dark" onclick="setTheme('dark')">
+    <div class="dot" style="background:#1A1510;border-color:#3A3028"></div> Obsidian
+  </div>
+  <div class="theme-opt premium-locked" data-theme="sepia" id="sepia-opt">
+    <div class="dot" style="background:#F2E8D5;"></div> Sepia 🔒
+  </div>
+</div>
+
+<!-- EXPORT MENU -->
+<div id="export-menu">
+  <button class="export-opt" onclick="exportFile('md')">📄 Export .md</button>
+  <button class="export-opt" onclick="exportFile('txt')">📃 Export .txt</button>
+  <button class="export-opt premium-locked" onclick="exportFilePremium('html')">🌐 Export .html</button>
+</div>
+
+<!-- PREMIUM MODAL -->
+<div id="premium-modal">
+  <div class="modal-box" style="position:relative">
+    <button class="modal-close-x" onclick="closePremiumModal()">×</button>
+    <div class="icon">✦</div>
+    <h2>Unlock SwiftWrite Premium</h2>
+    <p>One flat payment. No subscription. Yours forever.</p>
+    <ul class="modal-features">
+      <li>Up to 20 documents</li>
+      <li>Sepia theme</li>
+      <li>Focus mode</li>
+      <li>Export to .html</li>
+      <li>All future free updates</li>
+    </ul>
+    <a href="YOUR_LEMON_SQUEEZY_CHECKOUT_LINK" class="btn-primary" target="_blank" rel="noopener">Get Premium — $9.00</a>
+    <div id="license-section">
+      <input type="text" id="license-input" placeholder="Enter license key…" />
+      <button class="btn-secondary" onclick="activateLicense()">Activate License Key</button>
+    </div>
+    <button class="btn-secondary" onclick="closePremiumModal()" style="margin-top:4px;">Continue with Free</button>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+const FREE_DOC_LIMIT = 1;
+const PREMIUM_DOC_LIMIT = 20;
+
+let state = {
+  docs: [],
+  activeDoc: null,
+  isPremium: false,
+  theme: 'light',
+  view: 'edit'
+};
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('swiftwrite_state');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      state.docs = parsed.docs || [];
+      state.isPremium = parsed.isPremium || false;
+      state.theme = parsed.theme || 'light';
+      state.view = parsed.view || 'edit';
+    }
+  } catch(e) {}
+
+  if (state.docs.length === 0) {
+    state.docs.push(createDoc('Untitled', '# Welcome to SwiftWrite\n\nA distraction-free markdown editor that lives in your browser.\n\nYour work saves automatically — no account needed.\n\n## Features\n\n- **Live preview** with Split view\n- **Auto-save** to your browser\n- **Dark & Light themes**\n- Clean, minimal interface\n\n> Start writing below. Everything is saved locally.'));
+  }
+
+  state.activeDoc = state.docs[0].id;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem('swiftwrite_state', JSON.stringify({
+      docs: state.docs,
+      isPremium: state.isPremium,
+      theme: state.theme,
+      view: state.view
+    }));
+  } catch(e) {}
+}
+
+function createDoc(name, content = '') {
+  return { id: Date.now() + Math.random(), name, content, created: Date.now() };
+}
+
+// ── AUTOSAVE ──
+let saveTimer;
+function triggerSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const doc = state.docs.find(d => d.id === state.activeDoc);
+    if (doc) {
+      doc.content = editor.value;
+      const title = extractTitle(doc.content);
+      doc.name = title;
+      saveState();
+      showSavedIndicator();
+      renderTabs();
+    }
+  }, 600);
+}
+
+function showSavedIndicator() {
+  const el = document.getElementById('save-indicator');
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function extractTitle(content) {
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.replace(/^#+\s*/, '').trim();
+    if (trimmed) return trimmed.slice(0, 28) || 'Untitled';
+  }
+  return 'Untitled';
+}
+
+// ── RENDER TABS ──
+function renderTabs() {
+  const container = document.getElementById('doc-tabs');
+  const addBtn = document.getElementById('add-doc-btn');
+  container.innerHTML = '';
+
+  state.docs.forEach(doc => {
+    const tab = document.createElement('button');
+    tab.className = 'doc-tab' + (doc.id === state.activeDoc ? ' active' : '');
+    tab.title = doc.name;
+    tab.innerHTML = `${doc.name}<span class="close-tab" data-id="${doc.id}">×</span>`;
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('close-tab')) {
+        closeDoc(doc.id);
+      } else {
+        switchDoc(doc.id);
+      }
+    });
+    container.appendChild(tab);
+  });
+
+  container.appendChild(addBtn);
+
+  // Show/hide add btn based on limit
+  const limit = state.isPremium ? PREMIUM_DOC_LIMIT : FREE_DOC_LIMIT;
+  addBtn.style.display = state.docs.length >= limit ? 'none' : 'flex';
+}
+
+function switchDoc(id) {
+  // save current
+  const cur = state.docs.find(d => d.id === state.activeDoc);
+  if (cur) cur.content = editor.value;
+
+  state.activeDoc = id;
+  const doc = state.docs.find(d => d.id === id);
+  if (doc) {
+    editor.value = doc.content;
+    updatePreview();
+    updateCounts();
+    document.getElementById('status-doc').textContent = doc.name;
+  }
+  renderTabs();
+  saveState();
+}
+
+function closeDoc(id) {
+  if (state.docs.length <= 1) return;
+  state.docs = state.docs.filter(d => d.id !== id);
+  if (state.activeDoc === id) {
+    state.activeDoc = state.docs[0].id;
+    editor.value = state.docs[0].content;
+    updatePreview();
+  }
+  renderTabs();
+  saveState();
+}
+
+function addDoc() {
+  const limit = state.isPremium ? PREMIUM_DOC_LIMIT : FREE_DOC_LIMIT;
+  if (state.docs.length >= limit) {
+    if (!state.isPremium) showPremiumModal('You\'ve reached the free document limit (1). Upgrade to manage up to 20 documents.');
+    return;
+  }
+  const doc = createDoc('Untitled');
+  state.docs.push(doc);
+  switchDoc(doc.id);
+}
+
+// ── EDITOR ──
+const editor = document.getElementById('editor');
+
+editor.addEventListener('input', () => {
+  updatePreview();
+  updateCounts();
+  triggerSave();
+});
+
+editor.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+    editor.selectionStart = editor.selectionEnd = start + 2;
+  }
+});
+
+function updatePreview() {
+  const content = document.getElementById('preview-content');
+  if (content) content.innerHTML = marked.parse(editor.value || '');
+}
+
+function updateCounts() {
+  const text = editor.value;
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const chars = text.length;
+  const lines = text.split('\n').length;
+
+  document.getElementById('word-count').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+  document.getElementById('status-words').textContent = `⬡ ${words} words`;
+  document.getElementById('status-chars').textContent = `${chars} chars`;
+  document.getElementById('status-lines').textContent = `${lines} lines`;
+}
+
+// ── VIEWS ──
+function setView(v) {
+  state.view = v;
+  const editorPane = document.getElementById('editor-pane');
+  const previewPane = document.getElementById('preview-pane');
+
+  document.getElementById('btn-edit').classList.toggle('active', v === 'edit');
+  document.getElementById('btn-split').classList.toggle('active', v === 'split');
+  document.getElementById('btn-preview').classList.toggle('active', v === 'preview');
+
+  if (v === 'edit') {
+    editorPane.style.display = 'flex';
+    previewPane.style.display = 'none';
+  } else if (v === 'split') {
+    editorPane.style.display = 'flex';
+    previewPane.style.display = 'block';
+  } else {
+    editorPane.style.display = 'none';
+    previewPane.style.display = 'block';
+    updatePreview();
+  }
+
+  saveState();
+}
+
+// ── FOCUS MODE ──
+document.getElementById('focus-btn').addEventListener('click', toggleFocus);
+document.addEventListener('keydown', e => {
+  if (e.key === 'F11') { e.preventDefault(); toggleFocus(); }
+  if (e.key === 'Escape' && document.body.classList.contains('focus-mode')) toggleFocus();
+});
+
+function toggleFocus() {
+  if (!state.isPremium) { showPremiumModal('Focus mode is a Premium feature.'); return; }
+  document.body.classList.toggle('focus-mode');
+}
+
+// ── THEME ──
+document.getElementById('theme-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('theme-picker').classList.toggle('show');
+  document.getElementById('export-menu').classList.remove('show');
+});
+
+function setTheme(t) {
+  if (t === 'sepia' && !state.isPremium) { showPremiumModal('The Sepia theme is a Premium feature.'); return; }
+  state.theme = t;
+  document.documentElement.setAttribute('data-theme', t === 'light' ? '' : t);
+  document.querySelectorAll('.theme-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === t);
+  });
+  document.getElementById('theme-picker').classList.remove('show');
+  saveState();
+}
+
+// ── EXPORT ──
+document.getElementById('export-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('export-menu').classList.toggle('show');
+  document.getElementById('theme-picker').classList.remove('show');
+});
+
+function getActiveDocName() {
+  const doc = state.docs.find(d => d.id === state.activeDoc);
+  return doc ? doc.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'document';
+}
+
+function exportFile(ext) {
+  const content = editor.value;
+  const blob = new Blob([content], { type: ext === 'md' ? 'text/markdown' : 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${getActiveDocName()}.${ext}`;
+  a.click();
+  document.getElementById('export-menu').classList.remove('show');
+}
+
+function exportFilePremium(ext) {
+  if (!state.isPremium) { showPremiumModal('HTML export is a Premium feature.'); return; }
+  document.getElementById('export-menu').classList.remove('show');
+  const htmlContent = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${getActiveDocName()}</title>
+<style>body{font-family:Georgia,serif;max-width:720px;margin:60px auto;padding:0 24px;line-height:1.8;color:#2C2416;}
+h1,h2,h3{font-weight:500;}code{background:#f5f0e8;padding:2px 6px;border-radius:3px;}
+pre{background:#f5f0e8;padding:16px;border-radius:6px;overflow-x:auto;}
+blockquote{border-left:3px solid #C85A2A;padding-left:1.2em;color:#888;font-style:italic;}</style>
+</head><body>${marked.parse(editor.value)}</body></html>`;
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${getActiveDocName()}.html`;
+  a.click();
+}
+
+// ── PREMIUM MODAL ──
+function showPremiumModal(msg) {
+  document.querySelector('#premium-modal p').textContent = msg || 'Upgrade to unlock all features.';
+  document.getElementById('premium-modal').classList.add('show');
+}
+
+function closePremiumModal() {
+  document.getElementById('premium-modal').classList.remove('show');
+}
+
+document.getElementById('upgrade-btn').addEventListener('click', () => showPremiumModal('Upgrade to SwiftWrite Premium — one flat payment, yours forever.'));
+
+document.getElementById('premium-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('premium-modal')) closePremiumModal();
+});
+
+function activateLicense() {
+  const key = document.getElementById('license-input').value.trim();
+  // Simple hash-based check — replace with real Lemon Squeezy validation webhook in production
+  if (key.length > 12 && key.startsWith('SW-')) {
+    state.isPremium = true;
+    saveState();
+    closePremiumModal();
+    applyPremiumUI();
+    alert('✦ Premium activated! Thank you.');
+  } else {
+    alert('Invalid license key. Keys begin with SW- and are 20+ characters.');
+  }
+}
+
+function applyPremiumUI() {
+  document.getElementById('sepia-opt').classList.remove('premium-locked');
+  document.getElementById('sepia-opt').textContent = '';
+  document.getElementById('sepia-opt').innerHTML = '<div class="dot" style="background:#F2E8D5;"></div> Sepia';
+  document.querySelectorAll('.export-opt.premium-locked').forEach(el => el.classList.remove('premium-locked'));
+}
+
+// ── CLOSE DROPDOWNS ON OUTSIDE CLICK ──
+document.addEventListener('click', () => {
+  document.getElementById('theme-picker').classList.remove('show');
+  document.getElementById('export-menu').classList.remove('show');
+});
+
+// ── ADD DOC BTN ──
+document.getElementById('add-doc-btn').addEventListener('click', addDoc);
+
+// ── INIT ──
+loadState();
+setTheme(state.theme);
+setView(state.view);
+
+const activeDoc = state.docs.find(d => d.id === state.activeDoc);
+if (activeDoc) {
+  editor.value = activeDoc.content;
+  document.getElementById('status-doc').textContent = activeDoc.name;
+}
+
+if (state.isPremium) applyPremiumUI();
+
+updatePreview();
+updateCounts();
+renderTabs();
+</script>
+</body>
+</html>
